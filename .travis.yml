@@ -2,7 +2,7 @@
 
 language: c
 sudo: false
-dist: buster
+dist: trusty
 cache: bundler
 notifications:
   email: false
@@ -17,7 +17,6 @@ matrix:
     - env: ASTVER=16.11.0
 
 before_install:
-  - apt -y install pkg-config
   - curl -sSL http://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTVER}.tar.gz | tar xvfz - --strip 1 -C ./
 
 before_script:
