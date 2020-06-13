@@ -1,6 +1,6 @@
-<a href="https://travis-ci.org/wdoekes/asterisk-chan-dongle">
+<a href="https://travis-ci.org/rusxakep/asterisk-chan-dongle">
   <img alt="Travis Build Status"
-       src="https://api.travis-ci.org/wdoekes/asterisk-chan-dongle.svg"/>
+       src="https://api.travis-ci.org/rusxakep/asterisk-chan-dongle.svg"/>
 </a>
 
 chan\_dongle channel driver for Huawei UMTS cards
@@ -220,4 +220,4 @@ see: [HOWTO](https://gist.github.com/garronej/01f0dac45efe9161969a83890c019efa)
 
 For additional information about Huawei dongle usage look to
 chan\_dongle Wiki at http://wiki.e1550.mobi and chan\_dongle project home at
-https://github.com/wdoekes/asterisk-chan-dongle/
+https://github.com/rusxakep/asterisk-chan-dongle/
