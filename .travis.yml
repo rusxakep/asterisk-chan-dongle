@@ -2,7 +2,7 @@
 
 language: c
 sudo: false
-dist: trusty
+dist: buster
 cache: bundler
 notifications:
   email: false
@@ -17,13 +17,13 @@ matrix:
     - env: ASTVER=16.11.0
 
 before_install:
-  - curl -sSL http://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTVER}.tar.gz | tar xvfz - --strip 1 -C ./
+  - curl -sSL http://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTVER}.tar.gz | tar xfz -
 
 before_script:
   - aclocal
   - autoconf
   - automake -a || true  # do install stuff, don't create makefile
-  - ./configure --with-astversion=$ASTVER --with-asterisk=./include DESTDIR=/tmp
+  - ./configure --with-astversion=$ASTVER --with-asterisk=./asterisk-$ASTVER/include DESTDIR=/tmp
 
 script:
   - make clean all
