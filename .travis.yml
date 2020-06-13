@@ -8,23 +8,21 @@ notifications:
   email: false
 
 env:
-  - ASTVER=17.5.0
+  - ASTVER=17
 
 # Extend build matrix
 matrix:
   include:
-    - env: ASTVER=17.5.0
-    - env: ASTVER=16.11.0
+    - env: ASTVER=17
 
 before_install:
-  - curl -sSL http://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTVER}.tar.gz | tar xfz -
-  - cd ./asterisk-$ASTVER && ./configure --prefix=/usr && ./make install-headers
+  - tar jxf contrib/asterisk-$ASTVER.tar.bz2
 
 before_script:
   - aclocal
   - autoconf
   - automake -a || true  # do install stuff, don't create makefile
-  - ./configure --with-astversion=$ASTVER DESTDIR=/tmp
+  - ./configure --with-astversion=$ASTVER -with-asterisk=./asterisk-$ASTVER/include DESTDIR=/tmp
 
 script:
   - make clean all
