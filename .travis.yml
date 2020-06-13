@@ -2,19 +2,19 @@
 
 language: c
 sudo: false
-dist: trusty
+dist: buster
 cache: bundler
 notifications:
   email: false
 
 env:
-  - ASTVER=14
+  - ASTVER=17
 
 # Extend build matrix
 matrix:
   include:
+    - env: ASTVER=17
     - env: ASTVER=16
-    - env: ASTVER=13
 
 before_install:
   - wget http://junk.devs.nu/a/asterisk/asterisk-$ASTVER-include.tar.bz2
