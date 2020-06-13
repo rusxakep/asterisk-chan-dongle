@@ -18,7 +18,7 @@ matrix:
 
 before_install:
   - curl -sSL http://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTVER}.tar.gz | tar xfz -
-  - cd ./asterisk-$ASTVER && configure --prefix=/usr && make install-headers
+  - cd ./asterisk-$ASTVER && ./configure --prefix=/usr && ./make install-headers
 
 before_script:
   - aclocal
