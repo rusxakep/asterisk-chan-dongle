@@ -14,9 +14,10 @@ env:
 matrix:
   include:
     - env: ASTVER=17
+    - env: ASTVER=16
 
 before_install:
-  - tar jxf contrib/asterisk-$ASTVER.tar.bz2
+  - tar jxf contrib/asterisk-$ASTVER-include.tar.bz2
 
 before_script:
   - aclocal
