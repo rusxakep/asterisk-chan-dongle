@@ -28,8 +28,6 @@
 #include "smsdb.h"
 #include "error.h"
 
-#define DEF_STR(str)	str,STRLEN(str)
-
 #define CCWA_STATUS_NOT_ACTIVE	0
 #define CCWA_STATUS_ACTIVE	1
 
@@ -37,59 +35,17 @@
 #define CLCC_CALL_TYPE_DATA	1
 #define CLCC_CALL_TYPE_FAX	2
 
-/* magic!!! must be in same order as elements of enums in at_res_t */
 static const at_response_t at_responses_list[] = {
-	{ RES_PARSE_ERROR,"PARSE ERROR", 0, 0 },
-	{ RES_UNKNOWN,"UNKNOWN", 0, 0 },
 
-	{ RES_BOOT,"^BOOT",DEF_STR("^BOOT:") },
-	{ RES_BUSY,"BUSY",DEF_STR("BUSY\r") },
-	{ RES_CEND,"^CEND",DEF_STR("^CEND:") },
+	AT_RESPONSES_TABLE(AT_RES_AS_STRUCTLIST)
 
-	{ RES_CMGR, "+CMGR",DEF_STR("+CMGR:") },
-	{ RES_CMS_ERROR, "+CMS ERROR",DEF_STR("+CMS ERROR:") },
-	{ RES_CMTI, "+CMTI",DEF_STR("+CMTI:") },
-	{ RES_CDSI, "+CDSI",DEF_STR("+CDSI:") },
-	{ RES_CNUM, "+CNUM",DEF_STR("+CNUM:") },		/* and "ERROR+CNUM:" */
-
-	{ RES_CONF,"^CONF",DEF_STR("^CONF:") },
-	{ RES_CONN,"^CONN",DEF_STR("^CONN:") },
-	{ RES_COPS,"+COPS",DEF_STR("+COPS:") },
-	{ RES_CPIN,"+CPIN",DEF_STR("+CPIN:") },
-
-	{ RES_CREG,"+CREG",DEF_STR("+CREG:") },
-	{ RES_CSQ,"+CSQ",DEF_STR("+CSQ:") },
-	{ RES_CSSI,"+CSSI",DEF_STR("+CSSI:") },
-	{ RES_CSSU,"+CSSU",DEF_STR("+CSSU:") },
-
-	{ RES_CUSD,"+CUSD",DEF_STR("+CUSD:") },
-	{ RES_ERROR,"ERROR",DEF_STR("ERROR\r") },		/* and "COMMAND NOT SUPPORT\r" */
-	{ RES_MODE,"^MODE",DEF_STR("^MODE:") },
-	{ RES_NO_CARRIER,"NO CARRIER",DEF_STR("NO CARRIER\r") },
-
-	{ RES_NO_DIALTONE,"NO DIALTONE",DEF_STR("NO DIALTONE\r") },
-	{ RES_OK,"OK",DEF_STR("OK\r") },
-	{ RES_ORIG,"^ORIG",DEF_STR("^ORIG:") },
-	{ RES_RING,"RING",DEF_STR("RING\r") },
-
-	{ RES_RSSI,"^RSSI",DEF_STR("^RSSI:") },
-	{ RES_SMMEMFULL,"^SMMEMFULL",DEF_STR("^SMMEMFULL:") },
-	{ RES_SMS_PROMPT,"> ",DEF_STR("> ") },
-	{ RES_SRVST,"^SRVST",DEF_STR("^SRVST:") },
-
-	{ RES_CVOICE,"^CVOICE",DEF_STR("^CVOICE:") },
-	{ RES_CMGS,"+CMGS",DEF_STR("+CMGS:") },
-	{ RES_CPMS,"+CPMS",DEF_STR("+CPMS:") },
-	{ RES_CSCA,"+CSCA",DEF_STR("+CSCA:") },
-
-	{ RES_CLCC,"+CLCC", DEF_STR("+CLCC:") },
-	{ RES_CCWA,"+CCWA", DEF_STR("+CCWA:") },
-
-	/* duplicated response undef other id */
+	/* The hackish way to define the duplicated responses in the meantime */
+#define DEF_STR(str)	str,STRLEN(str)
 	{ RES_CNUM, "+CNUM",DEF_STR("ERROR+CNUM:") },
 	{ RES_ERROR,"ERROR",DEF_STR("COMMAND NOT SUPPORT\r") },
-	};
 #undef DEF_STR
+	};
+
 
 EXPORT_DEF const at_responses_t at_responses = { at_responses_list, 2, ITEMS_OF(at_responses_list), RES_MIN, RES_MAX};
 
@@ -274,7 +230,7 @@ static int at_response_ok (struct pvt* pvt, at_res_t res)
 
 			case CMD_AT_CMGR:
 				ast_debug (1, "[%s] SMS message see later\n", PVT_ID(pvt));
-				at_retrieve_next_sms(&pvt->sys_chan);
+				at_retrieve_next_sms(&pvt->sys_chan, at_cmd_suppress_error_mode(ecmd->flags));
 				break;
 
 			case CMD_AT_CMGD:
@@ -309,6 +265,29 @@ static int at_response_ok (struct pvt* pvt, at_res_t res)
 	return 0;
 }
 
+static void log_cmd_response_error(const struct pvt* pvt, const at_queue_cmd_t *ecmd, const char *fmt, ...)
+{
+	va_list ap;
+	char tempbuff[512];
+
+	if (at_cmd_suppress_error_mode(ecmd->flags) == SUPPRESS_ERROR_ENABLED) {
+		if (DEBUG_ATLEAST(1)) {
+			ast_log(AST_LOG_DEBUG, "[%s] Command response error suppressed:\n", PVT_ID(pvt));
+			va_start(ap, fmt);
+			vsnprintf(tempbuff, 512, fmt, ap);
+			va_end(ap);
+			ast_log(AST_LOG_DEBUG, "%s", tempbuff);
+		}
+
+		return;
+	}
+
+	va_start(ap, fmt);
+	vsnprintf(tempbuff, 512, fmt, ap);	
+	ast_log(LOG_ERROR, "%s", tempbuff);
+	va_end(ap);
+}
+
 /*!
  * \brief Handle ERROR response
  * \param pvt -- pvt structure
@@ -330,7 +309,7 @@ static int at_response_error (struct pvt* pvt, at_res_t res)
 			case CMD_AT_Z:
 			case CMD_AT_E:
 			case CMD_AT_CLCC:
-				ast_log (LOG_ERROR, "[%s] Command '%s' failed\n", PVT_ID(pvt), at_cmd2str (ecmd->cmd));
+				log_cmd_response_error(pvt, ecmd, "[%s] Command '%s' failed\n", PVT_ID(pvt), at_cmd2str (ecmd->cmd));
 				/* mean disconnected from device */
 				goto e_return;
 
@@ -339,44 +318,44 @@ static int at_response_error (struct pvt* pvt, at_res_t res)
 			case CMD_AT_CCWA_SET:
 			case CMD_AT_CCWA_STATUS:
 			case CMD_AT_CNUM:
-				ast_log (LOG_ERROR, "[%s] Command '%s' failed\n", PVT_ID(pvt), at_cmd2str (ecmd->cmd));
+				log_cmd_response_error(pvt, ecmd, "[%s] Command '%s' failed\n", PVT_ID(pvt), at_cmd2str (ecmd->cmd));
 				/* mean ignore error */
 				break;
 
 			case CMD_AT_CGMI:
-				ast_log (LOG_ERROR, "[%s] Getting manufacturer info failed\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Getting manufacturer info failed\n", PVT_ID(pvt));
 				goto e_return;
 
 			case CMD_AT_CGMM:
-				ast_log (LOG_ERROR, "[%s] Getting model info failed\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Getting model info failed\n", PVT_ID(pvt));
 				goto e_return;
 
 			case CMD_AT_CGMR:
-				ast_log (LOG_ERROR, "[%s] Getting firmware info failed\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Getting firmware info failed\n", PVT_ID(pvt));
 				goto e_return;
 
 			case CMD_AT_CMEE:
-				ast_log (LOG_ERROR, "[%s] Setting error verbosity level failed\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Setting error verbosity level failed\n", PVT_ID(pvt));
 				goto e_return;
 
 			case CMD_AT_CGSN:
-				ast_log (LOG_ERROR, "[%s] Getting IMEI number failed\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Getting IMEI number failed\n", PVT_ID(pvt));
 				goto e_return;
 
 			case CMD_AT_CIMI:
-				ast_log (LOG_ERROR, "[%s] Getting IMSI number failed\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Getting IMSI number failed\n", PVT_ID(pvt));
 				goto e_return;
 
 			case CMD_AT_CPIN:
-				ast_log (LOG_ERROR, "[%s] Error checking PIN state\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Error checking PIN state\n", PVT_ID(pvt));
 				goto e_return;
 
 			case CMD_AT_COPS_INIT:
-				ast_log (LOG_ERROR, "[%s] Error setting operator select parameters\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Error setting operator select parameters\n", PVT_ID(pvt));
 				goto e_return;
 
 			case CMD_AT_CREG_INIT:
-				ast_log (LOG_ERROR, "[%s] Error enabling registration info\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Error enabling registration info\n", PVT_ID(pvt));
 				goto e_return;
 
 			case CMD_AT_CREG:
@@ -394,18 +373,18 @@ static int at_response_error (struct pvt* pvt, at_res_t res)
 					/* continue initialization in other job at cmd CMD_AT_CMGF */
 					if (at_enqueue_initialization(task->cpvt, CMD_AT_CMGF))
 					{
-						ast_log (LOG_ERROR, "[%s] Error schedule initialization commands\n", PVT_ID(pvt));
+						log_cmd_response_error(pvt, ecmd, "[%s] Error schedule initialization commands\n", PVT_ID(pvt));
 						goto e_return;
 					}
 				}
 				break;
 /*
 			case CMD_AT_CLIP:
-				ast_log (LOG_ERROR, "[%s] Error enabling calling line indication\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Error enabling calling line indication\n", PVT_ID(pvt));
 				goto e_return;
 */
 			case CMD_AT_CSSN:
-				ast_log (LOG_ERROR, "[%s] Error Supplementary Service Notification activation failed\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Error Supplementary Service Notification activation failed\n", PVT_ID(pvt));
 				goto e_return;
 
 			case CMD_AT_CMGF:
@@ -423,7 +402,7 @@ static int at_response_error (struct pvt* pvt, at_res_t res)
 						/* continue initialization in other job at cmd CMD_AT_CSQ */
 						if (at_enqueue_initialization(task->cpvt, CMD_AT_CSQ))
 						{
-							ast_log (LOG_ERROR, "[%s] Error querying signal strength\n", PVT_ID(pvt));
+							log_cmd_response_error(pvt, ecmd, "[%s] Error querying signal strength\n", PVT_ID(pvt));
 							goto e_return;
 						}
 
@@ -444,17 +423,17 @@ static int at_response_error (struct pvt* pvt, at_res_t res)
 
 			case CMD_AT_A:
 			case CMD_AT_CHLD_2x:
-				ast_log (LOG_ERROR, "[%s] Answer failed for call idx %d\n", PVT_ID(pvt), task->cpvt->call_idx);
+				log_cmd_response_error(pvt, ecmd, "[%s] Answer failed for call idx %d\n", PVT_ID(pvt), task->cpvt->call_idx);
 				queue_hangup (task->cpvt->channel, 0);
 				break;
 
 			case CMD_AT_CHLD_3:
-				ast_log (LOG_ERROR, "[%s] Can't begin conference call idx %d\n", PVT_ID(pvt), task->cpvt->call_idx);
+				log_cmd_response_error(pvt, ecmd, "[%s] Can't begin conference call idx %d\n", PVT_ID(pvt), task->cpvt->call_idx);
 				queue_hangup(task->cpvt->channel, 0);
 				break;
 
 			case CMD_AT_CLIR:
-				ast_log (LOG_ERROR, "[%s] Setting CLIR failed\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Setting CLIR failed\n", PVT_ID(pvt));
 				break;
 
 			case CMD_AT_CHLD_2:
@@ -464,26 +443,26 @@ static int at_response_error (struct pvt* pvt, at_res_t res)
 				}
 				/* fall through */
 			case CMD_AT_D:
-				ast_log (LOG_ERROR, "[%s] Dial failed\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Dial failed\n", PVT_ID(pvt));
 				queue_control_channel (task->cpvt, AST_CONTROL_CONGESTION);
 				break;
 
 			case CMD_AT_DDSETEX:
-				ast_log (LOG_ERROR, "[%s] AT^DDSETEX failed\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] AT^DDSETEX failed\n", PVT_ID(pvt));
 				break;
 
 			case CMD_AT_CHUP:
 			case CMD_AT_CHLD_1x:
-				ast_log (LOG_ERROR, "[%s] Error sending hangup for call idx %d\n", PVT_ID(pvt), task->cpvt->call_idx);
+				log_cmd_response_error(pvt, ecmd, "[%s] Error sending hangup for call idx %d\n", PVT_ID(pvt), task->cpvt->call_idx);
 				break;
 
 			case CMD_AT_CMGR:
-				ast_log (LOG_ERROR, "[%s] Error reading SMS message\n", PVT_ID(pvt));
-				at_retrieve_next_sms(&pvt->sys_chan);
+				log_cmd_response_error(pvt, ecmd, "[%s] Error reading SMS message\n", PVT_ID(pvt));
+				at_retrieve_next_sms(&pvt->sys_chan, at_cmd_suppress_error_mode(ecmd->flags));
 				break;
 
 			case CMD_AT_CMGD:
-				ast_log (LOG_ERROR, "[%s] Error deleting SMS message\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Error deleting SMS message\n", PVT_ID(pvt));
 				break;
 
 			case CMD_AT_CMGS:
@@ -513,11 +492,11 @@ static int at_response_error (struct pvt* pvt, at_res_t res)
 				}
 
 				ast_verb (3, "[%s] Error sending SMS message %p\n", PVT_ID(pvt), task);
-				ast_log (LOG_ERROR, "[%s] Error sending SMS message %p %s\n", PVT_ID(pvt), task, at_cmd2str (ecmd->cmd));
+				log_cmd_response_error(pvt, ecmd, "[%s] Error sending SMS message %p %s\n", PVT_ID(pvt), task, at_cmd2str (ecmd->cmd));
 				break;
 
 			case CMD_AT_DTMF:
-				ast_log (LOG_ERROR, "[%s] Error sending DTMF\n", PVT_ID(pvt));
+				log_cmd_response_error(pvt, ecmd, "[%s] Error sending DTMF\n", PVT_ID(pvt));
 				break;
 
 			case CMD_AT_COPS:
@@ -531,11 +510,11 @@ static int at_response_error (struct pvt* pvt, at_res_t res)
 
 			case CMD_AT_CUSD:
 				ast_verb (3, "[%s] Error sending USSD %p\n", PVT_ID(pvt), task);
-				ast_log (LOG_ERROR, "[%s] Error sending USSD %p\n", PVT_ID(pvt), task);
+				log_cmd_response_error(pvt, ecmd, "[%s] Error sending USSD %p\n", PVT_ID(pvt), task);
 				break;
 
 			default:
-				ast_log (LOG_ERROR, "[%s] Received 'ERROR' for unhandled command '%s'\n", PVT_ID(pvt), at_cmd2str (ecmd->cmd));
+				log_cmd_response_error(pvt, ecmd, "[%s] Received 'ERROR' for unhandled command '%s'\n", PVT_ID(pvt), at_cmd2str (ecmd->cmd));
 				break;
 		}
 		at_queue_handle_result (pvt, res);
@@ -544,16 +523,16 @@ static int at_response_error (struct pvt* pvt, at_res_t res)
 	{
 		switch (ecmd->cmd) {
 		case CMD_AT_CMGR:
-			at_retrieve_next_sms(&pvt->sys_chan);
+			at_retrieve_next_sms(&pvt->sys_chan, at_cmd_suppress_error_mode(ecmd->flags));
 			break;
 		default:
-			ast_log (LOG_ERROR, "[%s] Received 'ERROR' when expecting '%s', ignoring\n", PVT_ID(pvt), at_res2str (ecmd->res));
+			log_cmd_response_error(pvt, ecmd, "[%s] Received 'ERROR' when expecting '%s', ignoring\n", PVT_ID(pvt), at_res2str (ecmd->res));
 			break;
 		}
 	}
 	else
 	{
-		ast_log (LOG_ERROR, "[%s] Received unexpected 'ERROR'\n", PVT_ID(pvt));
+		log_cmd_response_error(pvt, ecmd, "[%s] Received unexpected 'ERROR'\n", PVT_ID(pvt));
 	}
 
 	return 0;
@@ -1174,7 +1153,7 @@ at_poll_sms (struct pvt *pvt)
 
 		for (i = 0; i != SMS_INDEX_MAX; i++)
 		{
-			if (at_enqueue_retrieve_sms(&pvt->sys_chan, i))
+			if (at_enqueue_retrieve_sms(&pvt->sys_chan, i, SUPPRESS_ERROR_ENABLED))
 			{
 				ast_log (LOG_ERROR, "[%s] Error sending CMGR to retrieve SMS message #%d\n", PVT_ID(pvt), i);
 				return -1;
@@ -1212,7 +1191,7 @@ static int at_response_cmti (struct pvt* pvt, const char* str)
 	{
 		ast_debug (1, "[%s] Incoming SMS message\n", PVT_ID(pvt));
 
-		if (at_enqueue_retrieve_sms(&pvt->sys_chan, index))
+		if (at_enqueue_retrieve_sms(&pvt->sys_chan, index, SUPPRESS_ERROR_DISABLED))
 		{
 			ast_log (LOG_ERROR, "[%s] Error sending CMGR to retrieve SMS message\n", PVT_ID(pvt));
 			return -1;
@@ -1253,7 +1232,7 @@ static int at_response_cdsi (struct pvt* pvt, const char* str)
 	{
 		ast_debug (1, "[%s] Incoming SMS message\n", PVT_ID(pvt));
 
-		if (at_enqueue_retrieve_sms(&pvt->sys_chan, index))
+		if (at_enqueue_retrieve_sms(&pvt->sys_chan, index, SUPPRESS_ERROR_DISABLED))
 		{
 			ast_log (LOG_ERROR, "[%s] Error sending CMGR to retrieve SMS message\n", PVT_ID(pvt));
 			return -1;
@@ -1393,7 +1372,7 @@ receive_next:
 			at_enqueue_delete_sms(&pvt->sys_chan, pvt->incoming_sms_index);
 		}
 receive_next_no_delete:
-		at_retrieve_next_sms(&pvt->sys_chan);
+		at_retrieve_next_sms(&pvt->sys_chan, at_cmd_suppress_error_mode(ecmd->flags));
 	}
 	else
 	{
@@ -1485,9 +1464,9 @@ static int at_response_cusd (struct pvt * pvt, char * str, size_t len)
 		dcs = 0;
 	}
 
-	uint16_t out_ucs2[1024];
 	ast_verb (1, "[%s] USSD DCS=%d (0: gsm7, 1: ascii, 2: ucs2)\n", PVT_ID(pvt), dcs);
 	if (dcs == 0) { // GSM-7
+		uint16_t out_ucs2[1024];
 		int cusd_nibbles = unhex(cusd, cusd);
 		res = gsm7_unpack_decode(cusd, cusd_nibbles, out_ucs2, sizeof(out_ucs2) / 2, 0, 0, 0);
 		if (res < 0) {
@@ -1503,7 +1482,7 @@ static int at_response_cusd (struct pvt * pvt, char * str, size_t len)
 		}
 	} else if (dcs == 2) { // UCS-2
 		int cusd_nibbles = unhex(cusd, cusd);
-		res = ucs2_to_utf8(out_ucs2, (cusd_nibbles + 1) / 4, cusd_utf8_str, sizeof(cusd_utf8_str) - 1);
+		res = ucs2_to_utf8(cusd, (cusd_nibbles + 1) / 4, cusd_utf8_str, sizeof(cusd_utf8_str) - 1);
 	} else {
 		res = -1;
 	}
