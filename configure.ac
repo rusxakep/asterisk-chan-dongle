@@ -2,7 +2,7 @@ dnl init
 dnl AC_REVISION($Revision: 1.30 $)
 AC_PREREQ([2.60])
 AC_INIT([chan_dongle],[1.1],[https://github.com/rusxakep/asterisk-chan-dongle/issues],[chan_dongle],[https://github.com/rusxakep/asterisk-chan-dongle/])
-PACKAGE_REVISION="20200610"
+PACKAGE_REVISION="20200910"
 AC_CANONICAL_TARGET
 AM_INIT_AUTOMAKE
 AC_CONFIG_HEADERS([config.h])
