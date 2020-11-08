@@ -251,6 +251,8 @@ static int at_response_ok (struct pvt* pvt, at_res_t res)
 				break;
 			case CMD_USER:
 				break;
+            case CMD_AT_PORTSEL_1:
+				break;
 			default:
 				ast_log (LOG_ERROR, "[%s] Received 'OK' for unhandled command '%s'\n", PVT_ID(pvt), at_cmd2str (ecmd->cmd));
 				break;
@@ -1962,10 +1964,25 @@ int at_response (struct pvt* pvt, const struct iovec iov[2], int iovcnt, at_res_
 							ast_debug (1, "[%s] Got AT_CGMI data (manufacturer info)\n", PVT_ID(pvt));
 							return at_response_cgmi (pvt, str);
 
-						case CMD_AT_CGMM:
-							ast_debug (1, "[%s] Got AT_CGMM data (model info)\n", PVT_ID(pvt));
-							return at_response_cgmm (pvt, str);
+                        case CMD_AT_CGMM:
+                            {
+                                ast_debug (1, "[%s] Got AT_CGMM data (model info)\n", PVT_ID(pvt));
+    							int ret = at_response_cgmm (pvt, str);
 
+    							if (0==strncmp(pvt->model, "E173", 4)) {
+    							    ast_verb (1, "[%s] Queueing AT+PORTSEL=1 command for '%s'\n", PVT_ID(pvt), pvt->model);
+    								static const at_queue_cmd_t cmds[] = {
+    								    ATQ_CMD_DECLARE_ST(CMD_AT_PORTSEL_1, "AT^PORTSEL=1\r"),
+    								};
+    								int err = at_queue_insert(&pvt->sys_chan, cmds, 1, 0);
+    								if(err) {
+    								    ast_log (LOG_WARNING, "[%s] Failed to queue AT^PORTSEL=1 command\n", PVT_ID(pvt));
+    								}
+    							} else {
+    							    ast_verb (1, "[%s] Skipping AT+PORTSEL=1 command for '%s'\n", PVT_ID(pvt), pvt->model);
+    							}
+    							return ret;
+    						}
 						case CMD_AT_CGMR:
 							ast_debug (1, "[%s] Got AT+CGMR data (firmware info)\n", PVT_ID(pvt));
 							return at_response_cgmr (pvt, str);

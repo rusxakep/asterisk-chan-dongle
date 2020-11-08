@@ -74,6 +74,7 @@
 	_( AT_CHLD_2,       "AT+CHLD=2") \
 	_( AT_CHLD_3,       "AT+CHLD=3") \
 	_( AT_CLCC,         "AT+CLCC") \
+	_( AT_PORTSEL_1,    "AT^PORTSEL=1") \
 /* AT_COMMANDS_TABLE */
 
 typedef enum {
