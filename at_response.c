@@ -252,6 +252,7 @@ static int at_response_ok (struct pvt* pvt, at_res_t res)
 			case CMD_USER:
 				break;
             case CMD_AT_PORTSEL_1:
+                ast_debug (1, "[%s] Proactive event report set to modem port\n", PVT_ID(pvt));
 				break;
 			default:
 				ast_log (LOG_ERROR, "[%s] Received 'OK' for unhandled command '%s'\n", PVT_ID(pvt), at_cmd2str (ecmd->cmd));
@@ -1969,7 +1970,7 @@ int at_response (struct pvt* pvt, const struct iovec iov[2], int iovcnt, at_res_
                                 ast_debug (1, "[%s] Got AT_CGMM data (model info)\n", PVT_ID(pvt));
     							int ret = at_response_cgmm (pvt, str);
 
-    							if (0==strncmp(pvt->model, "E171", 4)) || (0==strncmp(pvt->model, "E173", 4)) {
+    							if (0==strncmp(pvt->model, "E171", 4) || strncmp(pvt->model, "E173", 4)) {
     							    ast_verb (1, "[%s] Queueing AT+PORTSEL=1 command for '%s'\n", PVT_ID(pvt), pvt->model);
     								static const at_queue_cmd_t cmds[] = {
     								    ATQ_CMD_DECLARE_ST(CMD_AT_PORTSEL_1, "AT^PORTSEL=1\r"),
