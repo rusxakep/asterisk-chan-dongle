@@ -29,7 +29,7 @@
 #include "smsdb.h"
 #include "error.h"
 
-static const char cmd_at[] 	 = "AT\r";
+static const char cmd_at[] 	     = "AT\r";
 static const char cmd_chld1x[]   = "AT+CHLD=1%d\r";
 static const char cmd_chld2[]    = "AT+CHLD=2\r";
 static const char cmd_clcc[]     = "AT+CLCC\r";
@@ -611,7 +611,7 @@ EXPORT_DEF int at_enqueue_activate(struct cpvt *cpvt)
 
 	if (cpvt->state != CALL_STATE_ONHOLD && cpvt->state != CALL_STATE_WAITING)
 	{
-		ast_log (LOG_ERROR, "[%s] Imposible activate call idx %d from state '%s'\n",
+		ast_log (LOG_ERROR, "[%s] Impossible activate call idx %d from state '%s'\n",
 				PVT_ID(cpvt->pvt), cpvt->call_idx, call_state2str(cpvt->state));
 		return -1;
 	}
